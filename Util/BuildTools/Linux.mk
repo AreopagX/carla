@@ -1,5 +1,8 @@
 default: help
 
+debug: 
+	@${CARLA_BUILD_TOOLS_FOLDER}/Debug.sh
+
 help:
 	@less ${CARLA_BUILD_TOOLS_FOLDER}/Linux.mk.help
 
