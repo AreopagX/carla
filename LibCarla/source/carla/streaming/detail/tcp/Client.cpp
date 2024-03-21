@@ -133,7 +133,7 @@ namespace tcp {
               }));
         } else {
           log_info("streaming client: connection failed:", ec.message());
-          Reconnect();
+          exit(-1); //Reconnect();
         }
       };
 
