@@ -37,8 +37,6 @@ float DeviationDotProduct(const cg::Location &reference_location,
 
 void PushWaypoint(ActorId actor_id, TrackTraffic &track_traffic,
                   Buffer &buffer, SimpleWaypointPtr &waypoint) {
-  auto loc = waypoint->GetWaypoint()->GetTransform().location;
-  logging::log("push waypoint x=", loc.x, ", y=", loc.y, ",z=", loc.z, ", r=", waypoint->GetWaypoint()->GetRoadId());
   const uint64_t waypoint_id = waypoint->GetId();
   buffer.push_back(waypoint);
   track_traffic.UpdatePassingVehicle(waypoint_id, actor_id);
@@ -47,8 +45,6 @@ void PushWaypoint(ActorId actor_id, TrackTraffic &track_traffic,
 void PopWaypoint(ActorId actor_id, TrackTraffic &track_traffic,
                  Buffer &buffer, bool front_or_back) {
   SimpleWaypointPtr removed_waypoint = front_or_back ? buffer.front() : buffer.back();
-  auto loc = removed_waypoint->GetTransform().location;
-  logging::log("pop waypoint x=", loc.x, ", y=", loc.y, ",z=", loc.z, ", r=", removed_waypoint->GetWaypoint()->GetRoadId());
   const uint64_t removed_waypoint_id = removed_waypoint->GetId();
   if (front_or_back) {
     buffer.pop_front();

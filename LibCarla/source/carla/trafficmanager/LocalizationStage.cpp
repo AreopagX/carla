@@ -106,7 +106,6 @@ void LocalizationStage::Update(const unsigned long index) {
 
   // Initializing buffer if it is empty.
   if (waypoint_buffer.empty()) {
-    logging::log(actor_id, " initializing buffer");
     SimpleWaypointPtr closest_waypoint = local_map->GetWaypoint(vehicle_location);
     PushWaypoint(actor_id, track_traffic, waypoint_buffer, closest_waypoint);
   }
@@ -157,7 +156,6 @@ void LocalizationStage::Update(const unsigned long index) {
   if (auto_or_force_lane_change
       && front_waypoint_not_junction
       && (recently_not_executed_lane_change || done_with_previous_lane_change)) {
-    //logging::log("forced lane change");
     SimpleWaypointPtr change_over_point = AssignLaneChange(actor_id, vehicle_location, vehicle_speed,
                                                            force_lane_change, lane_change_direction);
 
@@ -177,7 +175,6 @@ void LocalizationStage::Update(const unsigned long index) {
 
   Path imported_path = parameters.GetCustomPath(actor_id);
   Route imported_actions = parameters.GetImportedRoute(actor_id);
-  //logging::log(index, "importing path");
   // We are effectively importing a path.
   if (!imported_path.empty()) {
 
@@ -191,7 +188,6 @@ void LocalizationStage::Update(const unsigned long index) {
 
   // Populating the buffer through randomly chosen waypoints.
   else {
-    logging::log("imported route is empty. this should not happen");
     while (waypoint_buffer.back()->DistanceSquared(waypoint_buffer.front()) <= horizon_square) {
       SimpleWaypointPtr furthest_waypoint = waypoint_buffer.back();
       std::vector<SimpleWaypointPtr> next_waypoints = furthest_waypoint->GetNextWaypoint();
@@ -232,16 +228,6 @@ void LocalizationStage::Update(const unsigned long index) {
 
   // Updating geodesic grid position for actor.
   track_traffic.UpdateGridPosition(actor_id, waypoint_buffer);
-
-  /*size_t leng = waypoint_buffer.size();
-  for (size_t idx = 0; idx < leng; idx++) {
-    auto waypoint = waypoint_buffer.at(idx);
-    auto loc = waypoint->GetWaypoint()->GetTransform().location;
-    logging::log(idx, "x=", loc.x, ", y=", loc.y, ",z=", loc.z);
-  }
-  logging::log("#################################################");
-  logging::log("\n");*/
-
 }
 
 void LocalizationStage::ExtendAndFindSafeSpace(const ActorId actor_id,
@@ -280,7 +266,6 @@ void LocalizationStage::ExtendAndFindSafeSpace(const ActorId actor_id,
 
     // Extend buffer if safe point not found.
     if (!safe_point_found) {
-      logging::log("safe point not found!");
       bool abort = false;
 
       while (!past_junction && !abort) {
@@ -465,7 +450,6 @@ SimpleWaypointPtr LocalizationStage::AssignLaneChange(const ActorId actor_id,
 }
 
 void LocalizationStage::ImportPath(Path &imported_path, Buffer &waypoint_buffer, const ActorId actor_id, const float horizon_square) {
-    //logging::log(actor_id, "path to import: ", imported_path.size());
     // Remove the waypoints already added to the path, except for the first.
     if (parameters.GetUploadPath(actor_id)) {
       auto number_of_pops = waypoint_buffer.size();
@@ -523,21 +507,6 @@ void LocalizationStage::ImportPath(Path &imported_path, Buffer &waypoint_buffer,
             break;
           }
 
-          logging::log("imported road id: ", imported_road_id);
-          for (auto wayp:junction_outgoing_roads) {
-            logging::log("outgoing: ", wayp->GetWaypoint()->GetRoadId());
-          }
-          for (auto wayp:next_waypoints) {
-            logging::log("next: ", wayp->GetWaypoint()->GetRoadId());
-          }
-          for (uint64_t idx = 0; idx < imported_path.size(); idx++) {
-            if (idx >= 5) break;
-            auto loc = imported_path.at(idx);
-            auto wayp = local_map->GetWaypoint(loc);
-            logging::log("import path: ", wayp->GetWaypoint()->GetRoadId());
-          }
-
-
           /*
           Second, match the reachable junction roads with the roads that are saved in 
           'junction_outgoing_roads'. Thereby we want to find a road which connects the road
@@ -554,16 +523,6 @@ void LocalizationStage::ImportPath(Path &imported_path, Buffer &waypoint_buffer,
             }
             if (in_junction_road_id_set) break;
           }
-          if (!in_junction_road_id_set)
-            logging::log("failed! :(");
-          /*auto imported_candidates = local_map->GetWaypointsInDelta(latest_imported, 10, 0.1);
-          for (uint64_t idx = 0; idx < imported_candidates.size(); idx++) {
-            logging::log("candidate ", imported_candidates.at(idx)->GetWaypoint()->GetRoadId());
-            if (imported_candidates.at(idx)->GetWaypoint()->GetRoadId() == in_junction_road_id) {
-              imported = imported_candidates.at(idx);
-              break;
-            }
-          }*/
         } else {
           for (uint64_t next_waypoint_idx = 0; next_waypoint_idx < next_waypoints.size(); next_waypoint_idx++) {
             if (in_junction_road_id == next_waypoints.at(next_waypoint_idx)->GetWaypoint()->GetRoadId()) {
@@ -572,64 +531,6 @@ void LocalizationStage::ImportPath(Path &imported_path, Buffer &waypoint_buffer,
             }
           }
         }
-        
-
-        // push all waypoints within this junction and a small margin beyond
-        // TODO: what happens with next_waypoints?
-        // TODO: make sure that junctions are really the same (ambiguous)
-        /*if (success) {
-          auto loc = imported_path.begin();
-          cg::Location junction_end_point = *loc;
-          for (; loc != imported_path.end();) {
-            auto wayp = local_map->GetWaypoint(*loc);
-            if (wayp->GetWaypoint()->GetJunctionId() == imported->GetWaypoint()->GetJunctionId()) {
-              PushWaypoint(actor_id, track_traffic, waypoint_buffer, wayp);
-              junction_end_point = *loc;
-              imported_path.erase(loc);
-            } else if (junction_end_point.DistanceSquared(*loc) <= SQUARE(SAFE_DISTANCE_AFTER_JUNCTION)) {
-              PushWaypoint(actor_id, track_traffic, waypoint_buffer, wayp);
-              imported_path.erase(loc);
-            } else { // (junction_end_point.DistanceSquared(*loc) > SQUARE(SAFE_DISTANCE_AFTER_JUNCTION))
-              if (imported_path.empty()) {
-                // Once we are done, check if we can clear the structure.
-                parameters.RemoveUploadPath(actor_id, true);
-              } else {
-                // Otherwise, update the structure with the waypoints that we still need to import.
-                //logging::log(actor_id, " length after import: ", imported_path.size());
-                parameters.UpdateUploadPath(actor_id, imported_path);
-              }
-              return;
-            }
-          }
-        }*/
-
-        // If this doesn't work, e.g., due to non-dense paths, fall back to the original
-        // strategy.
-        /*if (!success) {
-          logging::log("not successful");
-          for (uint64_t k = 0u; k < next_waypoints.size(); ++k) {
-            SimpleWaypointPtr junction_end_point = next_waypoints.at(k);
-            while (!junction_end_point->CheckJunction()) {
-              junction_end_point = junction_end_point->GetNextWaypoint().front();
-            }
-            while (junction_end_point->CheckJunction()) {
-              junction_end_point = junction_end_point->GetNextWaypoint().front();
-            }
-            while (next_waypoints.at(k)->DistanceSquared(junction_end_point) < 50.0f) {
-              junction_end_point = junction_end_point->GetNextWaypoint().front();
-            }
-            float jep_road_id = junction_end_point->GetWaypoint()->GetRoadId();
-            if (jep_road_id == imported_road_id) {
-              selection_index = k;
-              break;
-            }
-            float distance = junction_end_point->DistanceSquared(imported);
-            if (distance < min_distance) {
-              min_distance = distance;
-              selection_index = k;
-            }
-          }
-        }*/        
       } else if (next_waypoints.size() == 0) {
         if (!parameters.GetOSMMode()) {
           std::cout << "This map has dead-end roads, please change the set_open_street_map parameter to true" << std::endl;
@@ -679,7 +580,6 @@ void LocalizationStage::ImportPath(Path &imported_path, Buffer &waypoint_buffer,
       parameters.RemoveUploadPath(actor_id, true);
     } else {
       // Otherwise, update the structure with the waypoints that we still need to import.
-      //logging::log(actor_id, " length after import: ", imported_path.size());
       parameters.UpdateUploadPath(actor_id, imported_path);
     }
 }
